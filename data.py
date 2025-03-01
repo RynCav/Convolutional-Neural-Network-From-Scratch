@@ -1,33 +1,74 @@
-from utils import save, load, randomize_lists
-import numpy
+import numpy as np
+
 
 # inherited class, template
 class Data:
-    # initialize the data
-    def __init__(self, directory, valuation_set=False):
-        # load files, values are already normilized & y_true is onehot encoded
-        self.train_X, self.test_X = load(f'{directory}x_train.pkl'), load(f'{directory}x_test.pkl')
-        self.train_y, self.test_y = load(f'{directory}y_train.pkl'), load(f'{directory}y_test.pkl')
-        # get the size of the dataset
-        self.size = len(self.train_X)
+    # save file path and if validation set present
+    def __init__(self, directory):
+        # load data
+        self.train_X = np.load(f'{directory}Train_X.npy').astype('float32')
+        self.test_X  = np.load(f'{directory}Test_X.npy').astype('float32')
+
+        # load truth values
+        self.train_y = np.load(f'{directory}Train_y.npy').astype('float32')
+        self.test_y = np.load(f'{directory}Test_y.npy').astype('float32')
+
         # load the validation set if applicable
-        if valuation_set:
-            self.evaluate_y, self.evaluate_y = load(f'{directory}Evaluate_y'), load(f'{directory}Evaluate_y')
+        try:
+            self.val_X = np.load(f'{directory}Val_X.npy').astype('float32')
+            self.val_y = np.load(f'{directory}Val_X.npy').astype('float32')
+        except:
+           print('Validation set not found')
 
-    # load the training data
-    def train(self):
-        # Randomises the data
-        return randomize_lists(self.train_X, self.train_y)
+        # get the size of the dataset
+        self.size = self.train_X.shape
 
-    def evaluate(self):
-        return self.evaluate_X, self.evaluate_y
+        #save if there is a validation set
+        self.val = hasattr(self, 'val_X')
+
+    # normilize across all data for images between -1 - 1.
+    def normalize(self):
+        scale = np.max(self.train_X) / 2
+        self.train_X = (self.train_X - scale) / scale
+        self.test_X = (self.test_X - scale) / scale
+
+        try:
+            self.val_X = (self.val_X - scale) / scale
+        except:
+            print('Validation set not normalized because it doesnt exist')
+
+    # randomly shuffle data for each epoch in training
+    def shuffle(self):
+        shuffled_indices = np.random.permutation(len(self.train_X))
+        self.train_X, self.train_y = self.train_X[shuffled_indices], self.train_y[shuffled_indices]
+
+    # get a batch of the training set
+    def get_batch(self, batch_size, i):
+        # returns a batch of n size that is conatins data that hasnt been trained before in the current Epoch
+        return self.train_X[i * batch_size:(i + 1) * batch_size], self.train_y[i * batch_size:(i + 1) * batch_size]
+
+    # returns validation set
+    def validation(self):
+        try:
+            return self.val_X, self.val_y
+        except:
+            raise Exception('Validation set not found')
 
     # load the testing data
     def test(self):
         # returns the testing data
         return self.test_X, self.test_y
 
+    # save data
+    def save(self, directory = 'Datasets/'):
+        np.save(f'{directory}Train_X.npy', self.train_X)
+        np.save(f'{directory}Test_X.npy', self.test_X)
 
-# Define the datasets
-FashionMNIST = Data('Datasets/Fashion MNIST/')
+        np.save(f'{directory}Train_y.npy', self.train_y)
+        np.save(f'{directory}Test_y.npy', self.test_y)
 
+        try:
+            np.save(f'{directory}Val_X.npy', self.val_X)
+            np.save(f'{directory}Val_y.npy', self.val_y)
+        except:
+            print('Validation set not saved because it doesnt exist')
